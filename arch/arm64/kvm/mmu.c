@@ -993,17 +993,21 @@ int kvm_init_stage2_mmu(struct kvm *kvm, struct kvm_s2_mmu *mmu, unsigned long t
 	struct kvm_pgtable *pgt;
 	u64 mmfr0, mmfr1;
 	u32 phys_shift;
+	u32 ipa_limit = kvm_ipa_limit;
+
+	if (kvm_is_realm(kvm))
+		ipa_limit = kvm_realm_ipa_limit();
 
 	phys_shift = KVM_VM_TYPE_ARM_IPA_SIZE(type);
 	if (is_protected_kvm_enabled()) {
 		phys_shift = kvm_ipa_limit;
 	} else if (phys_shift) {
-		if (phys_shift > kvm_ipa_limit ||
+		if (phys_shift > ipa_limit ||
 		    phys_shift < ARM64_MIN_PARANGE_BITS)
 			return -EINVAL;
 	} else {
 		phys_shift = KVM_PHYS_SHIFT;
-		if (phys_shift > kvm_ipa_limit) {
+		if (phys_shift > ipa_limit) {
 			pr_warn_once("%s using unsupported default IPA limit, upgrade your VMM\n",
 				     current->comm);
 			return -EINVAL;
@@ -1141,6 +1145,13 @@ void kvm_free_stage2_pgd(struct kvm_s2_mmu *mmu)
 		return;
 
 	write_lock(&kvm->mmu_lock);
+	if (kvm_is_realm(kvm) &&
+	    (kvm_realm_state(kvm) != REALM_STATE_DEAD &&
+	     kvm_realm_state(kvm) != REALM_STATE_NONE)) {
+		/* TODO: teardown rtts */
+		write_unlock(&kvm->mmu_lock);
+		return;
+	}
 	pgt = mmu->pgt;
 	if (pgt) {
 		mmu->pgd_phys = 0;

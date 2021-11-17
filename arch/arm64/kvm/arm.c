@@ -136,6 +136,13 @@ int kvm_vm_ioctl_enable_cap(struct kvm *kvm,
 		}
 		mutex_unlock(&kvm->slots_lock);
 		break;
+	case KVM_CAP_ARM_RME:
+		if (!kvm_is_realm(kvm))
+			return -EINVAL;
+		mutex_lock(&kvm->lock);
+		r = kvm_realm_enable_cap(kvm, cap);
+		mutex_unlock(&kvm->lock);
+		break;
 	default:
 		r = -EINVAL;
 		break;
@@ -199,6 +206,13 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 
 	bitmap_zero(kvm->arch.vcpu_features, KVM_VCPU_MAX_FEATURES);
 
+	/* Initialise the realm bits after the generic bits are enabled */
+	if (kvm_is_realm(kvm)) {
+		ret = kvm_init_realm_vm(kvm);
+		if (ret)
+			goto err_free_cpumask;
+	}
+
 	return 0;
 
 err_free_cpumask:
@@ -238,6 +252,7 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
 	if (atomic64_read(&kvm->stat.protected_hyp_mem))
 		kvm_err("%lluB of donations to the nVHE hyp are missing\n",
 			atomic64_read(&kvm->stat.protected_hyp_mem));
+	kvm_destroy_realm(kvm);
 }
 
 static int kvm_check_extension(struct kvm *kvm, long ext)
@@ -348,6 +363,9 @@ static int kvm_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_ARM_SUPPORTED_BLOCK_SIZES:
 		r = kvm_supported_block_sizes();
 		break;
+	case KVM_CAP_ARM_RME:
+		r = static_key_enabled(&kvm_rme_is_available);
+		break;
 	default:
 		r = 0;
 	}
@@ -405,6 +423,9 @@ static int pkvm_check_extension(struct kvm *kvm, long ext, int kvm_cap)
 		break;
 	case KVM_CAP_ARM_PROTECTED_VM:
 		r = 1;
+		break;
+	case KVM_CAP_ARM_RME:
+		r = static_key_enabled(&kvm_rme_is_available);
 		break;
 	default:
 		r = 0;
