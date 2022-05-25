@@ -642,6 +642,9 @@ nommu:
 
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 {
+	if (vcpu_is_rec(vcpu))
+		return;
+
 	if (is_protected_kvm_enabled()) {
 		kvm_call_hyp(__vgic_v3_save_vmcr_aprs,
 			     &vcpu->arch.vgic_cpu.vgic_v3);
@@ -814,6 +817,10 @@ int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
 	}
 
 	if (!irqchip_in_kernel(kvm)) {
+		/* Userspace irqchip not yet supported with Realms */
+		if (kvm_is_realm(vcpu->kvm))
+			return -EOPNOTSUPP;
+
 		/*
 		 * Tell the rest of the code that there are userspace irqchip
 		 * VMs in the wild.
