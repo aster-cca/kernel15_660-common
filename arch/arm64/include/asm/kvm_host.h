@@ -690,6 +690,9 @@ struct kvm_vcpu_arch {
 
 	/* PAGE_SIZE bound list of requests from the hypervisor to the host. */
 	struct kvm_hyp_req *hyp_reqs;
+
+	/* Realm meta data */
+	struct realm_rec rec;
 };
 
 /*
