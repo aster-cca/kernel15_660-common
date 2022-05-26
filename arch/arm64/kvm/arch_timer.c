@@ -162,6 +162,13 @@ static void timer_set_cval(struct arch_timer_context *ctxt, u64 cval)
 
 static void timer_set_offset(struct arch_timer_context *ctxt, u64 offset)
 {
+	struct kvm_vcpu *vcpu = ctxt->vcpu;
+
+	if (kvm_is_realm(vcpu->kvm)) {
+		WARN_ON(offset);
+		return;
+	}
+
 	if (unlikely(!ctxt->offset.vm_offset)) {
 		WARN(offset && !kvm_vm_is_protected(ctxt->vcpu->kvm),
 			"timer %ld\n", arch_timer_ctx_index(ctxt));
@@ -459,6 +466,21 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
 					  timer_ctx->irq.level,
 					  timer_ctx);
 		WARN_ON(ret);
+	}
+}
+
+void kvm_realm_timers_update(struct kvm_vcpu *vcpu)
+{
+	struct arch_timer_cpu *arch_timer = &vcpu->arch.timer_cpu;
+	int i;
+
+	for (i = 0; i < NR_KVM_TIMERS; i++) {
+		struct arch_timer_context *timer = &arch_timer->timers[i];
+		bool status = timer_get_ctl(timer) & ARCH_TIMER_CTRL_IT_STAT;
+		bool level = kvm_timer_irq_can_fire(timer) && status;
+
+		if (level != timer->irq.level)
+			kvm_timer_update_irq(vcpu, level, timer);
 	}
 }
 
@@ -833,6 +855,11 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
+	kvm_timer_unblocking(vcpu);
+
+	if (vcpu_is_rec(vcpu))
+		return;
+
 	get_timer_map(vcpu, &map);
 
 	if (static_branch_likely(&has_gic_active_state)) {
@@ -845,8 +872,6 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
 	} else {
 		kvm_timer_vcpu_load_nogic(vcpu);
 	}
-
-	kvm_timer_unblocking(vcpu);
 
 	timer_restore_state(map.direct_vtimer);
 	if (map.direct_ptimer)
@@ -884,6 +909,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 	if (unlikely(!timer->enabled))
 		return;
 
+	if (vcpu_is_rec(vcpu))
+		goto out;
+
 	get_timer_map(vcpu, &map);
 
 	timer_save_state(map.direct_vtimer);
@@ -904,6 +932,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
 	if (map.emul_ptimer)
 		soft_timer_cancel(&map.emul_ptimer->hrtimer);
 
+out:
 	if (kvm_vcpu_is_blocking(vcpu))
 		kvm_timer_blocking(vcpu);
 }
@@ -993,7 +1022,9 @@ static void timer_context_init(struct kvm_vcpu *vcpu, int timerid)
 	ctxt->vcpu = vcpu;
 
 	if (!kvm_vm_is_protected(vcpu->kvm)) {
-		if (timerid == TIMER_VTIMER)
+		if (kvm_is_realm(vcpu->kvm))
+			ctxt->offset.vm_offset = NULL;
+		else if (timerid == TIMER_VTIMER)
 			ctxt->offset.vm_offset = &kvm->arch.timer_data.voffset;
 		else
 			ctxt->offset.vm_offset = &kvm->arch.timer_data.poffset;
@@ -1019,13 +1050,19 @@ static void timer_context_init(struct kvm_vcpu *vcpu, int timerid)
 void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
 {
 	struct arch_timer_cpu *timer = vcpu_timer(vcpu);
+	u64 cntvoff;
 
 	for (int i = 0; i < NR_KVM_TIMERS; i++)
 		timer_context_init(vcpu, i);
 
+	if (kvm_is_realm(vcpu->kvm))
+		cntvoff = 0;
+	else
+		cntvoff = kvm_phys_timer_read();
+
 	/* Synchronize offsets across timers of a VM if not already provided */
 	if (!test_bit(KVM_ARCH_FLAG_VM_COUNTER_OFFSET, &vcpu->kvm->arch.flags)) {
-		timer_set_offset(vcpu_vtimer(vcpu), kvm_phys_timer_read());
+		timer_set_offset(vcpu_vtimer(vcpu), cntvoff);
 		timer_set_offset(vcpu_ptimer(vcpu), 0);
 	}
 
@@ -1532,6 +1569,13 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
 		kvm_debug("incorrectly configured timer irqs\n");
 		return -EINVAL;
 	}
+
+	/*
+	 * We don't use mapped IRQs for Realms because the RMI doesn't allow
+	 * us setting the LR.HW bit in the VGIC.
+	 */
+	if (vcpu_is_rec(vcpu))
+		return 0;
 
 	get_timer_map(vcpu, &map);
 
