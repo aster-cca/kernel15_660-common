@@ -385,7 +385,7 @@
  * bits in PAR are res0.
  */
 #define PAR_TO_HPFAR(par)		\
-	(((par) & GENMASK_ULL(52 - 1, 12)) >> 8)
+	(((par) & GENMASK_ULL(MAX_PHYS_MASK_SHIFT - 1, 12)) >> 8)
 
 #define FAR_MASK GENMASK_ULL(11, 0)
 
