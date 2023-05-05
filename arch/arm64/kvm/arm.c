@@ -303,7 +303,6 @@ static int kvm_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_ONE_REG:
 	case KVM_CAP_ARM_PSCI:
 	case KVM_CAP_ARM_PSCI_0_2:
-	case KVM_CAP_READONLY_MEM:
 	case KVM_CAP_MP_STATE:
 	case KVM_CAP_IMMEDIATE_EXIT:
 	case KVM_CAP_VCPU_EVENTS:
@@ -319,6 +318,9 @@ static int kvm_check_extension(struct kvm *kvm, long ext)
 		break;
 	case KVM_CAP_ARM_NISV_TO_USER:
 		r = !kvm || !kvm_vm_is_protected(kvm);
+		break;
+	case KVM_CAP_READONLY_MEM:
+		r = !kvm_is_realm(kvm);
 		break;
 	case KVM_CAP_SET_GUEST_DEBUG2:
 		return KVM_GUESTDBG_VALID_MASK;
