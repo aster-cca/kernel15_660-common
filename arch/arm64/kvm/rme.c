@@ -11,6 +11,8 @@
 #include <asm/rmi_cmds.h>
 #include <asm/virt.h>
 
+#include <asm/ccandroid/benchmark.h>
+
 /************ FIXME: Copied from kvm/hyp/pgtable.c **********/
 #include <asm/kvm_pgtable.h>
 
@@ -187,6 +189,7 @@ static void realm_destroy_undelegate_range(struct realm *realm,
 
 	while (ipa < end) {
 		ret = rmi_data_destroy(rd, ipa, &addr, &top);
+		// kvm_err("realm_destroy_range: ipa=0x%lx, addr=0x%lx, top=0x%lx, size=%ld\n", ipa, addr, top, size);
 		if (RMI_RETURN_STATUS(ret) == RMI_ERROR_RTT) {
 			if (top > ipa) {
 				/* UNASSIGNED */
@@ -209,13 +212,16 @@ static void realm_destroy_undelegate_range(struct realm *realm,
 			break;
 		}
 		ret = rmi_granule_undelegate(addr);
+		// kvm_err("realm_undelegate_range: ipa=0x%lx, addr=0x%lx, top=0x%lx, size=%ld, ret=%d\n", ipa, addr, top, size, ret);
 
 		/*
 		 * If the undelegate fails then something has gone seriously
 		 * wrong: take an extra reference to just leak the page
 		 */
-		if (WARN_ON(ret))
+		if (WARN_ON(ret)){
 			get_page(phys_to_page(addr));
+			// kvm_err("Realm UNDELEG failed: ipa=0x%lx, addr=0x%lx, top=0x%lx, size=%ld\n", ipa, addr, top, size);
+		}
 
 		ipa = top;
 	}
@@ -316,7 +322,7 @@ static int realm_create_rd(struct kvm *kvm)
 		}
 	}
 
-	realm->ia_bits = VTCR_EL2_IPA(kvm->arch.mmu.vtcr);
+	realm->ia_bits = VTCR_EL2_IPA(kvm->arch.vtcr);
 
 	params->rtt_level_start = get_start_level(realm);
 	params->rtt_num_start = pgd_sz;
@@ -766,6 +772,7 @@ err:
 	return -ENXIO;
 }
 
+#if 0
 int realm_map_non_secure(struct realm *realm,
 			 unsigned long ipa,
 			 struct page *page,
@@ -775,12 +782,15 @@ int realm_map_non_secure(struct realm *realm,
 	phys_addr_t rd = virt_to_phys(realm->rd);
 	int map_level;
 	int ret = 0;
+	phys_addr_t pa = page_to_phys(page);
 	unsigned long desc = page_to_phys(page) |
 			     PTE_S2_MEMATTR(MT_S2_FWB_NORMAL) |
 			     /* FIXME: Read+Write permissions for now */
 			     (3 << 6) |
 			     PTE_SHARED;
 
+	// kvm_info("XXX: realm_map_non_secure: ipa=0x%lx, pa=0x%llx, map_size=%lx\n", ipa, pa, map_size);
+	
 	if (WARN_ON(!IS_ALIGNED(ipa, map_size)))
 		return -EINVAL;
 
@@ -795,6 +805,66 @@ int realm_map_non_secure(struct realm *realm,
 		return -EINVAL;
 	}
 
+	// pr_info("rmi_rtt_map_unprotected(ipa=%lx, pa: %llx)\n", ipa, pa);
+	ret = rmi_rtt_map_unprotected(rd, ipa, map_level+pa, desc);
+	// ret = rmi_rtt_map_unprotected(rd, ipa, map_level, desc);
+
+	if (RMI_RETURN_STATUS(ret) == RMI_ERROR_RTT) {
+		/* Create missing RTTs and retry */
+		int level = RMI_RETURN_INDEX(ret);
+
+		ret = realm_create_rtt_levels(realm, ipa, level, map_level, memcache);
+		if (WARN_ON(ret))
+			return -ENXIO;
+
+		// pr_info("rmi_rtt_map_unprotected after realm_create_rtt_levels: (ipa=%lx, pa: %llx)\n", ipa, pa);
+		ret = rmi_rtt_map_unprotected(rd, ipa, map_level+pa, desc);
+		// ret = rmi_rtt_map_unprotected(rd, ipa, map_level, desc);
+	}
+	if (WARN_ON(ret))
+		return -ENXIO;
+
+	return 0;
+}
+#endif
+
+# if 1
+// unmodified: 
+int realm_map_non_secure(struct realm *realm,
+			 unsigned long ipa,
+			 struct page *page,
+			 unsigned long map_size,
+			 struct kvm_mmu_memory_cache *memcache)
+{
+	phys_addr_t rd = virt_to_phys(realm->rd);
+	int map_level;
+	int ret = 0;
+	phys_addr_t pa = page_to_phys(page);
+	unsigned long desc = page_to_phys(page) |
+			     PTE_S2_MEMATTR(MT_S2_FWB_NORMAL) |
+			     /* FIXME: Read+Write permissions for now */
+			     (3 << 6) |
+			     PTE_SHARED;
+
+	// kvm_info("realm_map_non_secure: ipa=0x%lx, pa=0x%llx, map_size=%lu\n", ipa, pa, map_size);
+	
+	if (WARN_ON(!IS_ALIGNED(ipa, map_size)))
+		return -EINVAL;
+
+	switch (map_size) {
+	case PAGE_SIZE:
+		map_level = 3;
+		break;
+	case RME_L2_BLOCK_SIZE:
+		map_level = 2;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	(void) pa;
+
+	// ret = rmi_rtt_map_unprotected(rd, ipa, map_level+pa, desc);
 	ret = rmi_rtt_map_unprotected(rd, ipa, map_level, desc);
 
 	if (RMI_RETURN_STATUS(ret) == RMI_ERROR_RTT) {
@@ -806,6 +876,7 @@ int realm_map_non_secure(struct realm *realm,
 		if (WARN_ON(ret))
 			return -ENXIO;
 
+		// ret = rmi_rtt_map_unprotected(rd, ipa, map_level+pa, desc);
 		ret = rmi_rtt_map_unprotected(rd, ipa, map_level, desc);
 	}
 	if (WARN_ON(ret))
@@ -813,6 +884,7 @@ int realm_map_non_secure(struct realm *realm,
 
 	return 0;
 }
+#endif
 
 static int populate_par_region(struct kvm *kvm,
 			       phys_addr_t ipa_base,
@@ -1392,8 +1464,12 @@ int kvm_rec_enter(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
 
+	CCA_MARKER_HYP_SWITCH_VCPU_RUN_VHE;
+
 	if (kvm_realm_state(vcpu->kvm) != REALM_STATE_ACTIVE)
 		return -EINVAL;
+
+	CCA_MARKER_KVM_VCPU_ENTER_EXIT;
 
 	return rmi_rec_enter(virt_to_phys(rec->rec_page),
 			     virt_to_phys(rec->run));
@@ -1561,7 +1637,7 @@ int kvm_init_realm_vm(struct kvm *kvm)
 		return -ENOMEM;
 
 	/* Default parameters, not exposed to user space */
-	params->s2sz = VTCR_EL2_IPA(kvm->arch.mmu.vtcr);
+	params->s2sz = VTCR_EL2_IPA(kvm->arch.vtcr);
 	kvm->arch.realm.params = params;
 	return 0;
 }

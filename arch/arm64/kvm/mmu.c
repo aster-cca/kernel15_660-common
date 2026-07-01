@@ -2124,7 +2124,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu)
 	unsigned long fault_status;
 	phys_addr_t fault_ipa;
 	struct kvm_memory_slot *memslot;
-	unsigned long hva;
+	unsigned long hva, hpa;
 	bool is_iabt, write_fault, writable;
 	gpa_t gpa_stolen_mask = kvm_gpa_stolen_bits(vcpu->kvm);
 	gfn_t gfn;
@@ -2186,6 +2186,8 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu)
 	gfn = (fault_ipa & ~gpa_stolen_mask) >> PAGE_SHIFT;
 	memslot = gfn_to_memslot(vcpu->kvm, gfn);
 	hva = gfn_to_hva_memslot_prot(memslot, gfn, &writable);
+	hpa = virt_to_phys((void*)hva);
+	(void) hpa;
 	write_fault = kvm_is_write_fault(vcpu);
 	if (kvm_is_error_hva(hva) || (write_fault && !writable)) {
 		/*
@@ -2244,8 +2246,11 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu)
 
 	if (is_protected_kvm_enabled() && fault_status != ESR_ELx_FSC_PERM)
 		ret = pkvm_mem_abort(vcpu, fault_ipa, hva);
-	else
+	else{
 		ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
+		// kvm_info("Abort HPA: 0x%lx\n", hpa);
+	}
+		// ret = user_mem_abort(vcpu, fault_ipa, memslot, hva, fault_status);
 
 	if (ret == 0)
 		ret = 1;

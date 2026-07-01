@@ -46,6 +46,9 @@
 
 #include <trace/hooks/fault.h>
 
+#include <asm/memory.h>
+
+
 struct fault_info {
 	int	(*fn)(unsigned long far, unsigned long esr,
 		      struct pt_regs *regs);
@@ -808,6 +811,8 @@ static int do_gpf_ptw(unsigned long far, unsigned long esr, struct pt_regs *regs
 static int do_gpf(unsigned long far, unsigned long esr, struct pt_regs *regs)
 {
 	const struct fault_info *inf = esr_to_fault_info(esr);
+
+	pr_info("GPF FAR=%#lx (PHYS: %#llx ) ESR=%#lx\n", far, virt_to_phys((const volatile void *)far), esr);
 
 	if (!is_el1_instruction_abort(esr) && fixup_exception(regs))
 		return 0;

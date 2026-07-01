@@ -197,7 +197,7 @@ int set_direct_map_default_noflush(struct page *page)
 				   PAGE_SIZE, change_page_range, &data);
 }
 
-static int __set_memory_encrypted(unsigned long addr,
+int __set_memory_encrypted(unsigned long addr,
 				  int numpages,
 				  bool encrypt)
 {
@@ -222,16 +222,6 @@ static int __set_memory_encrypted(unsigned long addr,
 	return __change_memory_common(addr, PAGE_SIZE * numpages,
 				      __pgprot(set_prot),
 				      __pgprot(clear_prot));
-}
-
-int set_memory_encrypted(unsigned long addr, int numpages)
-{
-	return __set_memory_encrypted(addr, numpages, true);
-}
-
-int set_memory_decrypted(unsigned long addr, int numpages)
-{
-	return __set_memory_encrypted(addr, numpages, false);
 }
 
 #ifdef CONFIG_DEBUG_PAGEALLOC

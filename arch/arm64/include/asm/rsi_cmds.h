@@ -9,6 +9,7 @@
 #include <linux/arm-smccc.h>
 
 #include <asm/rsi_smc.h>
+#include <asm/memory.h>
 
 enum ripas {
 	RSI_RIPAS_EMPTY,

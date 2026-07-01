@@ -11,12 +11,14 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_rme.h>
 #include <asm/kvm_mmu.h>
+#include <asm/ccandroid/benchmark.h>
 
 typedef int (*exit_handler_fn)(struct kvm_vcpu *vcpu);
 
 static int rec_exit_reason_notimpl(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
+	CCA_MARKER_HYP_EXIT_ESR_ELx_EC_HVC64;
 
 	pr_err("[vcpu %d] Unhandled exit reason from realm (ESR: %#llx)\n",
 	       vcpu->vcpu_id, rec->run->exit.esr);
@@ -26,6 +28,8 @@ static int rec_exit_reason_notimpl(struct kvm_vcpu *vcpu)
 static int rec_exit_sync_dabt(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
+
+	CCA_MARKER_HYP_EXIT_ESR_ELx_EC_DABT_LOW;
 
 	if (kvm_vcpu_dabt_iswrite(vcpu) && kvm_vcpu_dabt_isvalid(vcpu))
 		vcpu_set_reg(vcpu, kvm_vcpu_dabt_get_rd(vcpu),
@@ -46,6 +50,7 @@ static int rec_exit_sync_iabt(struct kvm_vcpu *vcpu)
 static int rec_exit_sys_reg(struct kvm_vcpu *vcpu)
 {
 	struct realm_rec *rec = &vcpu->arch.rec;
+	CCA_MARKER_HYP_EXIT_ESR_ELx_EC_SYS64;
 	unsigned long esr = kvm_vcpu_get_esr(vcpu);
 	int rt = kvm_vcpu_sys_get_rt(vcpu);
 	bool is_write = !(esr & 1);
@@ -99,7 +104,7 @@ static int rec_exit_ripas_change(struct kvm_vcpu *vcpu)
 	if (realm_is_addr_protected(realm, base) &&
 	    realm_is_addr_protected(realm, top - 1)) {
 		kvm_mmu_topup_memory_cache(&vcpu->arch.mmu_page_cache,
-					   kvm_mmu_cache_min_pages(vcpu->arch.hw_mmu));
+					   kvm_mmu_cache_min_pages(vcpu->kvm));
 		write_lock(&kvm->mmu_lock);
 		ret = realm_set_ipa_state(vcpu, base, top, ripas);
 		write_unlock(&kvm->mmu_lock);

@@ -28,6 +28,7 @@
 
 #include <nvhe/mem_protect.h>
 #include <nvhe/pkvm.h>
+#include <asm/ccandroid/benchmark.h>
 
 /* Non-VHE specific context */
 DEFINE_PER_CPU(struct kvm_host_data, kvm_host_data);
@@ -363,6 +364,7 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 		trace_hyp_exit();
 
 		/* Jump in the fire! */
+		CCA_MARKER_HYP_SWITCH_VCPU_RUN_NVHE;
 		exit_code = __guest_enter(vcpu);
 
 		/* And we're baaack! */

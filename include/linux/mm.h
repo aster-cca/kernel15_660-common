@@ -44,6 +44,10 @@ extern int sysctl_page_lock_unfairness;
 void mm_core_init(void);
 void init_mm_internals(void);
 
+int __set_memory_encrypted(unsigned long addr,
+				  int numpages,
+				  bool encrypt);
+
 #ifndef CONFIG_NUMA		/* Don't use mapnrs, do it properly */
 extern unsigned long max_mapnr;
 

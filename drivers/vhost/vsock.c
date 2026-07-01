@@ -558,20 +558,26 @@ static int vhost_vsock_start(struct vhost_vsock *vsock)
 	mutex_lock(&vsock->dev.mutex);
 
 	ret = vhost_dev_check_owner(&vsock->dev);
-	if (ret)
+	if (ret){
+		// pr_info("vhost_vsock_start: vhost_dev_check_owner failed\n");
 		goto err;
+	}
 
 	for (i = 0; i < ARRAY_SIZE(vsock->vqs); i++) {
 		vq = &vsock->vqs[i];
+		// pr_info("vhost_vsock_start: vq: %p (%ld)/%ld\n", vq, i, ARRAY_SIZE(vsock->vqs));
 
 		mutex_lock(&vq->mutex);
 
 		if (!vhost_vq_access_ok(vq)) {
+			// pr_info("vhost_vsock_start: vhost_vq_access_ok failed\n");
 			ret = -EFAULT;
 			goto err_vq;
 		}
+		// pr_info("vhost_vsock_start: vhost_vq_access_ok passed\n");
 
 		if (!vhost_vq_get_backend(vq)) {
+			// pr_info("vhost_vsock_start: vhost_vq_get_backend needs to be initialized\n");
 			vhost_vq_set_backend(vq, vsock);
 			ret = vhost_vq_init_access(vq);
 			if (ret)
@@ -828,12 +834,16 @@ static long vhost_vsock_dev_ioctl(struct file *f, unsigned int ioctl,
 
 	switch (ioctl) {
 	case VHOST_VSOCK_SET_GUEST_CID:
+		// pr_info("VHOST_VSOCK_SET_GUEST_CID: cid: %p, size: %ld\n", argp, sizeof(guest_cid));
 		if (copy_from_user(&guest_cid, argp, sizeof(guest_cid)))
 			return -EFAULT;
 		return vhost_vsock_set_cid(vsock, guest_cid);
 	case VHOST_VSOCK_SET_RUNNING:
-		if (copy_from_user(&start, argp, sizeof(start)))
+		// pr_info("VHOST_VSOCK_SET_RUNNING: start: %p, size: %ld\n", argp, sizeof(start));
+		if (copy_from_user(&start, argp, sizeof(start))){
+			// pr_info("VHOST_VSOCK_SET_RUNNING: copy_from_user failed\n");
 			return -EFAULT;
+		}
 		if (start)
 			return vhost_vsock_start(vsock);
 		else

@@ -272,6 +272,7 @@ enum {
 static inline void vhost_vq_set_backend(struct vhost_virtqueue *vq,
 					void *private_data)
 {
+	// pr_info("vhost_vq_set_backend: vq=%p, private_data=%p\n", vq, private_data);
 	vq->private_data = private_data;
 }
 

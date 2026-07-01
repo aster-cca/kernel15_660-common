@@ -49,6 +49,7 @@
 #include <kvm/arm_hypercalls.h>
 #include <kvm/arm_pmu.h>
 #include <kvm/arm_psci.h>
+#include <asm/ccandroid/benchmark.h>
 
 static enum kvm_mode kvm_mode = KVM_MODE_DEFAULT;
 
@@ -179,8 +180,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
 	int ret;
 
-	if (type & ~KVM_VM_TYPE_MASK)
-		return -EINVAL;
+	// if (type & ~KVM_VM_TYPE_MASK)
+	// 	return -EINVAL;
 
 	mutex_init(&kvm->arch.config_lock);
 
@@ -621,10 +622,10 @@ nommu:
 
 	kvm_vgic_load(vcpu);
 	kvm_timer_vcpu_load(vcpu);
-	if (has_vhe())
-		kvm_vcpu_load_sysregs_vhe(vcpu);
-	kvm_arch_vcpu_load_fp(vcpu);
-	kvm_vcpu_pmu_restore_guest(vcpu);
+	// if (has_vhe())
+	// 	kvm_vcpu_load_sysregs_vhe(vcpu);
+	// kvm_arch_vcpu_load_fp(vcpu);
+	// kvm_vcpu_pmu_restore_guest(vcpu);
 	if (kvm_arm_is_pvtime_enabled(&vcpu->arch))
 		kvm_make_request(KVM_REQ_RECORD_STEAL, vcpu);
 
@@ -638,7 +639,7 @@ nommu:
 		return;
 
 	if (has_vhe())
-		kvm_vcpu_load_vhe(vcpu);
+		kvm_vcpu_load_sysregs_vhe(vcpu);
 	kvm_arch_vcpu_load_fp(vcpu);
 	kvm_vcpu_pmu_restore_guest(vcpu);
 
@@ -1109,6 +1110,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 	struct kvm_run *run = vcpu->run;
 	int ret;
 
+	CCA_MARKER_KVM_VCPU_RUN;
+
 	if (run->exit_reason == KVM_EXIT_MMIO) {
 		ret = kvm_handle_mmio_return(vcpu);
 		if (ret)
@@ -1129,6 +1132,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 	run->flags = 0;
 	while (ret > 0) {
 		bool pmu_stopped = false;
+
+		CCA_MARKER_KVM_VCPU_RUN_LOOP_ITER;
 
 		/*
 		 * Check conditions before entering the guest
@@ -1199,6 +1204,14 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 		/**************************************************************
 		 * Enter the guest
 		 */
+
+#if 0
+		register uint64_t x0 __asm__ ("x0") = 0;
+		__asm volatile ("mrs x0, CurrentEL;" : : : "%x0");
+		pr_info("EL = %lld \n", x0 >> 2);
+		#endif
+
+
 		trace_kvm_entry(*vcpu_pc(vcpu));
 		guest_timing_enter_irqoff();
 

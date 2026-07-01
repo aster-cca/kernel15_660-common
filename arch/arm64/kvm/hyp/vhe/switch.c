@@ -27,6 +27,7 @@
 #include <asm/processor.h>
 #include <asm/thread_info.h>
 #include <asm/vectors.h>
+#include <asm/ccandroid/benchmark.h>
 
 /* VHE specific context */
 DEFINE_PER_CPU(struct kvm_host_data, kvm_host_data);
@@ -221,6 +222,7 @@ static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 	struct kvm_cpu_context *host_ctxt;
 	struct kvm_cpu_context *guest_ctxt;
 	u64 exit_code;
+	// CCA_MARKER_HYP_SWITCH_VCPU_RUN_VHE;
 
 	host_ctxt = &this_cpu_ptr(&kvm_host_data)->host_ctxt;
 	host_ctxt->__hyp_running_vcpu = vcpu;
@@ -254,6 +256,7 @@ static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 
 	do {
 		/* Jump in the fire! */
+		CCA_MARKER_GUEST_ENTER_VHE;
 		exit_code = __guest_enter(vcpu);
 
 		/* And we're baaack! */

@@ -455,12 +455,12 @@ u64 __vgic_v3_get_gic_config(void)
 	return val;
 }
 
-static u64 __vgic_v3_read_vmcr(void)
+u64 __vgic_v3_read_vmcr(void)
 {
 	return read_gicreg(ICH_VMCR_EL2);
 }
 
-static void __vgic_v3_write_vmcr(u32 vmcr)
+void __vgic_v3_write_vmcr(u32 vmcr)
 {
 	write_gicreg(vmcr, ICH_VMCR_EL2);
 }

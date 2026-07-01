@@ -7,6 +7,9 @@
 #define __ASM_MEM_ENCRYPT_H
 
 #include <asm/rsi.h>
+#include <asm-generic/bug.h>
+#include <linux/device.h>
+
 
 /* All DMA must be to non-secure memory for now */
 static inline bool force_dma_unencrypted(struct device *dev)

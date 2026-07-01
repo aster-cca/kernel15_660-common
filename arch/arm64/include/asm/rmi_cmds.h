@@ -9,6 +9,7 @@
 #include <linux/arm-smccc.h>
 
 #include <asm/rmi_smc.h>
+#include <asm/ccandroid/benchmark.h>
 
 struct rtt_entry {
 	unsigned long walk_level;
@@ -35,6 +36,8 @@ static inline int rmi_data_create(unsigned long rd, unsigned long data,
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_DATA_CREATE;
+
 	arm_smccc_1_1_invoke(SMC_RMI_DATA_CREATE, rd, data, ipa, src,
 			     flags, &res);
 
@@ -56,6 +59,8 @@ static inline int rmi_data_create_unknown(unsigned long rd,
 					  unsigned long ipa)
 {
 	struct arm_smccc_res res;
+
+	CCA_MARKER_HYP_CREATE_UNKNOWN;
 
 	arm_smccc_1_1_invoke(SMC_RMI_DATA_CREATE_UNKNOWN, rd, data, ipa, &res);
 
@@ -80,6 +85,8 @@ static inline int rmi_data_destroy(unsigned long rd, unsigned long ipa,
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_DATA_DESTROY;
+
 	arm_smccc_1_1_invoke(SMC_RMI_DATA_DESTROY, rd, ipa, &res);
 
 	*data_out = res.a1;
@@ -99,6 +106,8 @@ static inline int rmi_features(unsigned long index, unsigned long *out)
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_FEATURES;
+
 	arm_smccc_1_1_invoke(SMC_RMI_FEATURES, index, &res);
 
 	*out = res.a1;
@@ -117,6 +126,8 @@ static inline int rmi_granule_delegate(unsigned long phys)
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_DELEGATE;
+
 	arm_smccc_1_1_invoke(SMC_RMI_GRANULE_DELEGATE, phys, &res);
 
 	return res.a0;
@@ -134,6 +145,7 @@ static inline int rmi_granule_delegate(unsigned long phys)
 static inline int rmi_granule_undelegate(unsigned long phys)
 {
 	struct arm_smccc_res res;
+	CCA_MARKER_HYP_UNDELEGATE;
 
 	arm_smccc_1_1_invoke(SMC_RMI_GRANULE_UNDELEGATE, phys, &res);
 
@@ -157,6 +169,8 @@ static inline int rmi_psci_complete(unsigned long calling_rec,
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_PSCI_COMPLETE;
+
 	arm_smccc_1_1_invoke(SMC_RMI_PSCI_COMPLETE, calling_rec, target_rec,
 			     status, &res);
 
@@ -175,6 +189,7 @@ static inline int rmi_psci_complete(unsigned long calling_rec,
 static inline int rmi_realm_activate(unsigned long rd)
 {
 	struct arm_smccc_res res;
+	CCA_MARKER_HYP_REALM_ACTIVATE;
 
 	arm_smccc_1_1_invoke(SMC_RMI_REALM_ACTIVATE, rd, &res);
 
@@ -194,6 +209,8 @@ static inline int rmi_realm_create(unsigned long rd, unsigned long params_ptr)
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_REALM_CREATE;
+
 	arm_smccc_1_1_invoke(SMC_RMI_REALM_CREATE, rd, params_ptr, &res);
 
 	return res.a0;
@@ -210,6 +227,8 @@ static inline int rmi_realm_create(unsigned long rd, unsigned long params_ptr)
 static inline int rmi_realm_destroy(unsigned long rd)
 {
 	struct arm_smccc_res res;
+
+	CCA_MARKER_HYP_REALM_DESTROY;
 
 	arm_smccc_1_1_invoke(SMC_RMI_REALM_DESTROY, rd, &res);
 
@@ -230,6 +249,8 @@ static inline int rmi_realm_destroy(unsigned long rd)
 static inline int rmi_rec_aux_count(unsigned long rd, unsigned long *aux_count)
 {
 	struct arm_smccc_res res;
+
+	CCA_MARKER_HYP_REC_AUX_CNT;
 
 	arm_smccc_1_1_invoke(SMC_RMI_REC_AUX_COUNT, rd, &res);
 
@@ -253,6 +274,8 @@ static inline int rmi_rec_create(unsigned long rd, unsigned long rec,
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_REC_CREATE;
+
 	arm_smccc_1_1_invoke(SMC_RMI_REC_CREATE, rd, rec, params_ptr, &res);
 
 	return res.a0;
@@ -269,6 +292,8 @@ static inline int rmi_rec_create(unsigned long rd, unsigned long rec,
 static inline int rmi_rec_destroy(unsigned long rec)
 {
 	struct arm_smccc_res res;
+
+	CCA_MARKER_HYP_REC_DESTROY;
 
 	arm_smccc_1_1_invoke(SMC_RMI_REC_DESTROY, rec, &res);
 
@@ -288,6 +313,9 @@ static inline int rmi_rec_enter(unsigned long rec, unsigned long run_ptr)
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_REC_ENTER;
+
+	CCA_MARKER_GUEST_ENTER_VHE;
 	arm_smccc_1_1_invoke(SMC_RMI_REC_ENTER, rec, run_ptr, &res);
 
 	return res.a0;
@@ -309,6 +337,8 @@ static inline int rmi_rtt_create(unsigned long rd, unsigned long rtt,
 				 unsigned long ipa, unsigned long level)
 {
 	struct arm_smccc_res res;
+
+	CCA_MARKER_HYP_RTT_CREATE;
 
 	arm_smccc_1_1_invoke(SMC_RMI_RTT_CREATE, rd, rtt, ipa, level, &res);
 
@@ -335,6 +365,8 @@ static inline int rmi_rtt_destroy(unsigned long rd,
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_RTT_DESTROY;
+
 	arm_smccc_1_1_invoke(SMC_RMI_RTT_DESTROY, rd, ipa, level, &res);
 
 	*out_rtt = res.a1;
@@ -360,6 +392,8 @@ static inline int rmi_rtt_fold(unsigned long rd, unsigned long ipa,
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_RTT_FOLD;
+
 	arm_smccc_1_1_invoke(SMC_RMI_RTT_FOLD, rd, ipa, level, &res);
 
 	*out_rtt = res.a1;
@@ -382,6 +416,8 @@ static inline int rmi_rtt_init_ripas(unsigned long rd, unsigned long base,
 				     unsigned long top, unsigned long *out_top)
 {
 	struct arm_smccc_res res;
+
+	CCA_MARKER_HYP_RTT_INIT_RIPAS;
 
 	arm_smccc_1_1_invoke(SMC_RMI_RTT_INIT_RIPAS, rd, base, top, &res);
 
@@ -408,6 +444,8 @@ static inline int rmi_rtt_map_unprotected(unsigned long rd,
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_RTT_MAP_UNPROTECTED;
+
 	arm_smccc_1_1_invoke(SMC_RMI_RTT_MAP_UNPROTECTED, rd, ipa, level,
 			     desc, &res);
 
@@ -432,6 +470,8 @@ static inline int rmi_rtt_read_entry(unsigned long rd, unsigned long ipa,
 		SMC_RMI_RTT_READ_ENTRY,
 		rd, ipa, level
 	};
+
+	CCA_MARKER_HYP_RTT_READ_ENTRY;
 
 	arm_smccc_1_2_smc(&regs, &regs);
 
@@ -462,6 +502,8 @@ static inline int rmi_rtt_set_ripas(unsigned long rd, unsigned long rec,
 {
 	struct arm_smccc_res res;
 
+	CCA_MARKER_HYP_RTT_SET_RIPAS;
+
 	arm_smccc_1_1_invoke(SMC_RMI_RTT_SET_RIPAS, rd, rec, base, top, &res);
 
 	*out_top = res.a1;
@@ -486,6 +528,8 @@ static inline int rmi_rtt_unmap_unprotected(unsigned long rd,
 					    unsigned long *out_top)
 {
 	struct arm_smccc_res res;
+
+	CCA_MARKER_HYP_RTT_UNMAP_UNPROTECTED;
 
 	arm_smccc_1_1_invoke(SMC_RMI_RTT_UNMAP_UNPROTECTED, rd, ipa,
 			     level, &res);

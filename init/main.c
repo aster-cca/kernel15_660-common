@@ -105,6 +105,7 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
+#include <asm/ccandroid/benchmark.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/initcall.h>
@@ -1460,6 +1461,8 @@ static int __ref kernel_init(void *unused)
 	rcu_end_inkernel_boot();
 
 	do_sysctl_args();
+
+	CCA_NS_KERNEL_STOP;
 
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);

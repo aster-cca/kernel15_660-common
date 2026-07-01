@@ -30,6 +30,7 @@
 #include <asm/fpsimd.h>
 #include <asm/debug-monitors.h>
 #include <asm/processor.h>
+#include <asm/ccandroid/benchmark.h>
 
 struct kvm_exception_table_entry {
 	int insn, fixup;
@@ -285,6 +286,7 @@ static bool kvm_hyp_handle_fpsimd(struct kvm_vcpu *vcpu, u64 *exit_code)
 {
 	bool sve_guest;
 	u8 esr_ec;
+	CCA_MARKER_HYP_EXIT_ESR_ELx_EC_SVE;
 
 	if (!system_supports_fpsimd())
 		return false;
@@ -418,6 +420,7 @@ static bool kvm_hyp_handle_ptrauth(struct kvm_vcpu *vcpu, u64 *exit_code)
 {
 	struct kvm_cpu_context *ctxt;
 	u64 val;
+	CCA_MARKER_HYP_EXIT_ESR_ELx_EC_PAC;
 
 	if (!vcpu_has_ptrauth(vcpu))
 		return false;
@@ -513,6 +516,7 @@ static bool handle_ampere1_tcr(struct kvm_vcpu *vcpu)
 
 static bool kvm_hyp_handle_sysreg(struct kvm_vcpu *vcpu, u64 *exit_code)
 {
+	// CCA_MARKER_HYP_EXIT_ESR_ELx_EC_SYS64;
 	if (cpus_have_final_cap(ARM64_WORKAROUND_CAVIUM_TX2_219_TVM) &&
 	    handle_tx2_tvm(vcpu))
 		return true;
@@ -535,7 +539,8 @@ static bool kvm_hyp_handle_sysreg(struct kvm_vcpu *vcpu, u64 *exit_code)
 }
 
 static bool kvm_hyp_handle_cp15_32(struct kvm_vcpu *vcpu, u64 *exit_code)
-{
+{	
+	CCA_MARKER_HYP_EXIT_ESR_ELx_EC_CP15_32;
 	if (static_branch_unlikely(&vgic_v3_cpuif_trap) &&
 	    __vgic_v3_perform_cpuif_access(vcpu) == 1)
 		return true;
@@ -557,6 +562,8 @@ static bool kvm_hyp_handle_watchpt_low(struct kvm_vcpu *vcpu, u64 *exit_code)
 
 static bool kvm_hyp_handle_dabt_low(struct kvm_vcpu *vcpu, u64 *exit_code)
 {
+	// CCA_MARKER_HYP_EXIT_ESR_ELx_EC_DABT_LOW;
+
 	if (kvm_hyp_handle_memory_fault(vcpu, exit_code))
 		return true;
 

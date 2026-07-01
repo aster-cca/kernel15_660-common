@@ -20,6 +20,7 @@
 #include <nvhe/pkvm.h>
 #include <nvhe/rwlock.h>
 #include <nvhe/trap_handler.h>
+#include <asm/ccandroid/benchmark.h>
 
 /* Used by icache_is_vpipt(). */
 unsigned long __icache_flags;
@@ -1737,6 +1738,7 @@ bool kvm_handle_pvm_hvc64(struct kvm_vcpu *vcpu, u64 *exit_code)
  */
 bool kvm_hyp_handle_hvc64(struct kvm_vcpu *vcpu, u64 *exit_code)
 {
+	CCA_MARKER_HYP_EXIT_ESR_ELx_EC_HVC64;
 	u32 fn = smccc_get_function(vcpu);
 	struct pkvm_hyp_vcpu *hyp_vcpu;
 

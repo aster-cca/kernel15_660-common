@@ -79,56 +79,70 @@ void kvm_init_memshare_services(void)
 	memshare_granule_sz = res.a0;
 }
 
-static int arm_smccc_share_unshare_page(u32 func_id, phys_addr_t phys)
-{
-	phys_addr_t end = phys + PAGE_SIZE;
+// static int arm_smccc_share_unshare_page(u32 func_id, phys_addr_t phys)
+// {
+// 	phys_addr_t end = phys + PAGE_SIZE;
 
-	while (phys < end) {
-		struct arm_smccc_res res;
+// 	while (phys < end) {
+// 		struct arm_smccc_res res;
 
-		arm_smccc_1_1_invoke(func_id, phys, 0, 0, &res);
-		if (res.a0 != SMCCC_RET_SUCCESS)
-			return -EPERM;
+// 		arm_smccc_1_1_invoke(func_id, phys, 0, 0, &res);
+// 		if (res.a0 != SMCCC_RET_SUCCESS)
+// 			return -EPERM;
 
-		phys += memshare_granule_sz;
-	}
+// 		phys += memshare_granule_sz;
+// 	}
 
-	return 0;
-}
+// 	return 0;
+// }
 
-static int set_memory_xcrypted(u32 func_id, unsigned long start, int numpages)
-{
-	void *addr = (void *)start, *end = addr + numpages * PAGE_SIZE;
 
-	while (addr < end) {
-		int err;
-
-		err = arm_smccc_share_unshare_page(func_id, virt_to_phys(addr));
-		if (err)
-			return err;
-
-		addr += PAGE_SIZE;
-	}
-
-	return 0;
-}
 
 int set_memory_encrypted(unsigned long addr, int numpages)
 {
-	if (!memshare_granule_sz || WARN_ON(!PAGE_ALIGNED(addr)))
-		return 0;
-
-	return set_memory_xcrypted(ARM_SMCCC_VENDOR_HYP_KVM_MEM_UNSHARE_FUNC_ID,
-				   addr, numpages);
+	return __set_memory_encrypted(addr, numpages, true);
 }
 EXPORT_SYMBOL_GPL(set_memory_encrypted);
 
 int set_memory_decrypted(unsigned long addr, int numpages)
 {
-	if (!memshare_granule_sz || WARN_ON(!PAGE_ALIGNED(addr)))
-		return 0;
-
-	return set_memory_xcrypted(ARM_SMCCC_VENDOR_HYP_KVM_MEM_SHARE_FUNC_ID,
-				   addr, numpages);
+	return __set_memory_encrypted(addr, numpages, false);
 }
 EXPORT_SYMBOL_GPL(set_memory_decrypted);
+
+// static int set_memory_xcrypted(u32 func_id, unsigned long start, int numpages)
+// {
+// 	void *addr = (void *)start, *end = addr + numpages * PAGE_SIZE;
+
+// 	while (addr < end) {
+// 		int err;
+
+// 		err = arm_smccc_share_unshare_page(func_id, virt_to_phys(addr));
+// 		if (err)
+// 			return err;
+
+// 		addr += PAGE_SIZE;
+// 	}
+
+// 	return 0;
+// }
+
+// int set_memory_encrypted(unsigned long addr, int numpages)
+// {
+// 	if (!memshare_granule_sz || WARN_ON(!PAGE_ALIGNED(addr)))
+// 		return 0;
+
+// 	return set_memory_xcrypted(ARM_SMCCC_VENDOR_HYP_KVM_MEM_UNSHARE_FUNC_ID,
+// 				   addr, numpages);
+// }
+// EXPORT_SYMBOL_GPL(set_memory_encrypted);
+
+// int set_memory_decrypted(unsigned long addr, int numpages)
+// {
+// 	if (!memshare_granule_sz || WARN_ON(!PAGE_ALIGNED(addr)))
+// 		return 0;
+
+// 	return set_memory_xcrypted(ARM_SMCCC_VENDOR_HYP_KVM_MEM_SHARE_FUNC_ID,
+// 				   addr, numpages);
+// }
+// EXPORT_SYMBOL_GPL(set_memory_decrypted);

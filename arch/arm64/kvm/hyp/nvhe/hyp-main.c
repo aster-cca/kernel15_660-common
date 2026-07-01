@@ -1184,6 +1184,17 @@ static void handle___vgic_v3_init_lrs(struct kvm_cpu_context *host_ctxt)
 	__vgic_v3_init_lrs();
 }
 
+static void handle___vgic_v3_read_vmcr(struct kvm_cpu_context *host_ctxt)
+{
+	cpu_reg(host_ctxt, 1) = __vgic_v3_read_vmcr();
+}
+
+static void handle___vgic_v3_write_vmcr(struct kvm_cpu_context *host_ctxt)
+{
+	__vgic_v3_write_vmcr(cpu_reg(host_ctxt, 1));
+}
+
+
 static void handle___kvm_get_mdcr_el2(struct kvm_cpu_context *host_ctxt)
 {
 	cpu_reg(host_ctxt, 1) = __kvm_get_mdcr_el2();
@@ -1595,6 +1606,8 @@ static const hcall_t host_hcall[] = {
 	HANDLE_FUNC(__kvm_enable_ssbs),
 	HANDLE_FUNC(__vgic_v3_init_lrs),
 	HANDLE_FUNC(__vgic_v3_get_gic_config),
+	HANDLE_FUNC(__vgic_v3_read_vmcr),
+	HANDLE_FUNC(__vgic_v3_write_vmcr),
 	HANDLE_FUNC(__kvm_flush_vm_context),
 	HANDLE_FUNC(__kvm_tlb_flush_vmid_ipa),
 	HANDLE_FUNC(__kvm_tlb_flush_vmid_ipa_nsh),

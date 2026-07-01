@@ -1170,10 +1170,15 @@ static void __user *__vhost_get_user_slow(struct vhost_virtqueue *vq,
 {
 	int ret;
 
+	// pr_info("VHOST_GET_USER_SLOW addr %p size %d, iov %p, iov_size %lu, type %d\n",
+	// 	addr, size, vq->iotlb_iov, ARRAY_SIZE(vq->iotlb_iov), type);
 	ret = translate_desc(vq, (u64)(uintptr_t)addr, size, vq->iotlb_iov,
 			     ARRAY_SIZE(vq->iotlb_iov),
 			     VHOST_ACCESS_RO);
 	if (ret < 0) {
+		// pr_info("IOTLB translation failure: uaddr "
+		// 	"%p size 0x%llx\n", addr,
+		// 	(unsigned long long) size);
 		vq_err(vq, "IOTLB translation failure: uaddr "
 			"%p size 0x%llx\n", addr,
 			(unsigned long long) size);
@@ -1181,6 +1186,9 @@ static void __user *__vhost_get_user_slow(struct vhost_virtqueue *vq,
 	}
 
 	if (ret != 1 || vq->iotlb_iov[0].iov_len != size) {
+		// pr_info("Non atomic userspace memory access: uaddr "
+		// 	"%p size 0x%llx\n", addr,
+		// 	(unsigned long long) size);
 		vq_err(vq, "Non atomic userspace memory access: uaddr "
 			"%p size 0x%llx\n", addr,
 			(unsigned long long) size);
@@ -1201,10 +1209,16 @@ static inline void __user *__vhost_get_user(struct vhost_virtqueue *vq,
 {
 	void __user *uaddr = vhost_vq_meta_fetch(vq,
 			     (u64)(uintptr_t)addr, size, type);
-	if (uaddr)
+	if (uaddr){
+		// pr_info("VHOST_GET_USER uaddr %p\n", uaddr);
 		return uaddr;
+	}
+		// return uaddr;
 
-	return __vhost_get_user_slow(vq, addr, size, type);
+	uaddr = __vhost_get_user_slow(vq, addr, size, type);
+	// pr_info("VHOST_GET_USER uaddr %p\n", uaddr);
+
+	return uaddr;
 }
 
 #define vhost_put_user(vq, x, ptr)		\
@@ -1594,14 +1608,25 @@ static bool vq_access_ok(struct vhost_virtqueue *vq, unsigned int num,
 			 vring_used_t __user *used)
 
 {
+	bool access1=false, access2=false, access3=false;
 	/* If an IOTLB device is present, the vring addresses are
 	 * GIOVAs. Access validation occurs at prefetch time. */
-	if (vq->iotlb)
+	if (vq->iotlb){
+		// pr_info("vq_access_ok: vq->iotlb\n");
 		return true;
+	}
 
-	return access_ok(desc, vhost_get_desc_size(vq, num)) &&
-	       access_ok(avail, vhost_get_avail_size(vq, num)) &&
-	       access_ok(used, vhost_get_used_size(vq, num));
+	// pr_info("VQ Accesses: desc=%p, avail=%p, used=%p\n", desc, avail, used);
+
+	access1 = access_ok(desc, vhost_get_desc_size(vq, num));
+	access2 = access_ok(avail, vhost_get_avail_size(vq, num));
+	access3 = access_ok(used, vhost_get_used_size(vq, num));
+	// pr_info("vq_access_ok: access1=%d, access2=%d, access3=%d\n", access1, access2, access3);
+	return access1 && access2 && access3;
+
+	// return access_ok(desc, vhost_get_desc_size(vq, num)) &&
+	//        access_ok(avail, vhost_get_avail_size(vq, num)) &&
+	//        access_ok(used, vhost_get_used_size(vq, num));
 }
 
 static void vhost_vq_meta_update(struct vhost_virtqueue *vq,
@@ -1702,8 +1727,10 @@ static bool vq_log_access_ok(struct vhost_virtqueue *vq,
 /* Caller should have vq mutex and device mutex */
 bool vhost_vq_access_ok(struct vhost_virtqueue *vq)
 {
-	if (!vq_log_access_ok(vq, vq->log_base))
+	if (!vq_log_access_ok(vq, vq->log_base)){
+		// pr_info("vhost_vq_access_ok: vq_log_access_ok failed\n");
 		return false;
+	}
 
 	return vq_access_ok(vq, vq->num, vq->desc, vq->avail, vq->used);
 }
@@ -1735,6 +1762,9 @@ static long vhost_set_memory(struct vhost_dev *d, struct vhost_memory __user *m)
 		return -EFAULT;
 	}
 
+	// pr_info("vhost_set_memory: mem=%p, newmem=%p, newmem->regions=%p, mem.nregions=%d\n",
+	// 	&mem, newmem, newmem->regions, mem.nregions);
+
 	newumem = iotlb_alloc();
 	if (!newumem) {
 		kvfree(newmem);
@@ -1744,6 +1774,8 @@ static long vhost_set_memory(struct vhost_dev *d, struct vhost_memory __user *m)
 	for (region = newmem->regions;
 	     region < newmem->regions + mem.nregions;
 	     region++) {
+		// pr_info("vhost_set_memory: region->guest_phys_addr=%llx, region->memory_size=%llx, region->userspace_addr=%llx\n",
+		// 		region->guest_phys_addr, region->memory_size, region->userspace_addr);
 		if (vhost_iotlb_add_range(newumem,
 					  region->guest_phys_addr,
 					  region->guest_phys_addr +
@@ -1751,6 +1783,7 @@ static long vhost_set_memory(struct vhost_dev *d, struct vhost_memory __user *m)
 					  region->userspace_addr,
 					  VHOST_MAP_RW))
 			goto err;
+		
 	}
 
 	if (!memory_access_ok(d, newumem, 0))
@@ -1814,6 +1847,9 @@ static long vhost_vring_set_addr(struct vhost_dev *d,
 	    (u64)(unsigned long)a.used_user_addr != a.used_user_addr ||
 	    (u64)(unsigned long)a.avail_user_addr != a.avail_user_addr)
 		return -EFAULT;
+	
+	// pr_info("vhost_vring_set_addr: a.desc_user_addr=%llx, a.avail_user_addr=%llx, a.used_user_addr=%llx, a.log_guest_addr=%llx\n",
+	// 	a.desc_user_addr, a.avail_user_addr, a.used_user_addr, a.log_guest_addr);
 
 	/* Make sure it's safe to cast pointers to vring types. */
 	BUILD_BUG_ON(__alignof__ *vq->avail > VRING_AVAIL_ALIGN_SIZE);
@@ -1864,6 +1900,10 @@ static long vhost_vring_set_num_addr(struct vhost_dev *d,
 		break;
 	case VHOST_SET_VRING_ADDR:
 		r = vhost_vring_set_addr(d, vq, argp);
+		// if (r != 0)
+		// 	pr_info("vhost_vring_set_addr failed, r=%ld\n", r);
+		// else
+		// 	pr_info("vhost_vring_set_addr success\n");
 		break;
 	default:
 		BUG();
@@ -2061,6 +2101,10 @@ long vhost_dev_ioctl(struct vhost_dev *d, unsigned int ioctl, void __user *argp)
 	switch (ioctl) {
 	case VHOST_SET_MEM_TABLE:
 		r = vhost_set_memory(d, argp);
+		// if (r != 0)
+		// 	pr_info("VHOST_SET_MEM_TABLE failed: %ld\n", r);
+		// else 
+		// 	pr_info("VHOST_SET_MEM_TABLE success\n");
 		break;
 	case VHOST_SET_LOG_BASE:
 		if (copy_from_user(&p, argp, sizeof p)) {
@@ -2261,8 +2305,11 @@ EXPORT_SYMBOL_GPL(vhost_log_write);
 static int vhost_update_used_flags(struct vhost_virtqueue *vq)
 {
 	void __user *used;
-	if (vhost_put_used_flags(vq))
+	if (vhost_put_used_flags(vq)){
+		// pr_info("vhost_update_used_flags: vhost_put_used_flags failed\n");
 		return -EFAULT;
+	}
+	
 	if (unlikely(vq->log_used)) {
 		/* Make sure the flag is seen before log. */
 		smp_wmb();
@@ -2299,6 +2346,7 @@ int vhost_vq_init_access(struct vhost_virtqueue *vq)
 	__virtio16 last_used_idx;
 	int r;
 	bool is_le = vq->is_le;
+	// pr_info("vhost_vq_init_access\n");
 
 	if (!vq->private_data)
 		return 0;
@@ -2311,6 +2359,7 @@ int vhost_vq_init_access(struct vhost_virtqueue *vq)
 	vq->signalled_used_valid = false;
 	if (!vq->iotlb &&
 	    !access_ok(&vq->used->idx, sizeof vq->used->idx)) {
+		// pr_info("vhost_vq_init_access: access_ok failed for idx: %p\n", &vq->used->idx);
 		r = -EFAULT;
 		goto err;
 	}
@@ -2339,6 +2388,8 @@ static int translate_desc(struct vhost_virtqueue *vq, u64 addr, u32 len,
 	u64 s = 0, last = addr + len - 1;
 	int ret = 0;
 
+	// pr_info("translate_desc: addr=%llx, len=%x, iov=%p, iov_size=%d, access=%d\n", addr, len, iov, iov_size, access);
+
 	while ((u64)len > s) {
 		u64 size;
 		if (unlikely(ret >= iov_size)) {
@@ -2349,6 +2400,7 @@ static int translate_desc(struct vhost_virtqueue *vq, u64 addr, u32 len,
 		map = vhost_iotlb_itree_first(umem, addr, last);
 		if (map == NULL || map->start > addr) {
 			if (umem != dev->iotlb) {
+				// pr_info("translate_desc: umem=%p, dev->iotlb=%p, addr=%llx, last=%llx, map=%p\n", umem, dev->iotlb, addr, last, map);
 				ret = -EFAULT;
 				break;
 			}
